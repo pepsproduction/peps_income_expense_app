@@ -320,7 +320,7 @@ function rowToTransaction_(row) {
   return {
     id: String(row[0] || ''),
     created_at: formatCellDateTime_(created),
-    created_at_raw: created,
+    created_at_raw: created instanceof Date ? formatDateTime_(created) : String(created || ''),
     date: formatCellDate_(dateValue),
     time: String(row[3] || ''),
     type: String(row[4] || ''),
