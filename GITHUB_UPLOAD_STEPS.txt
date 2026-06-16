@@ -1,0 +1,14 @@
+คำสั่งลง GitHub แบบเร็ว
+
+cd peps_income_expense_app
+git init
+git add .
+git commit -m "Initial PEPS income expense app"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/peps-income-expense-app.git
+git push -u origin main
+
+หมายเหตุ:
+- โค้ดนี้ไม่ได้ทำให้ GitHub Pages เรียก Google Sheet โดยตรง
+- วิธี Deploy จริงคือ Google Apps Script Web App
+- GitHub ใช้เก็บ source code / version control

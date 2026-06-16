@@ -1,0 +1,74 @@
+# Verify Report
+
+ผล: ผ่าน 69/69 checks
+วันที่ตรวจ: 2026-06-16 19:43:23
+
+- ✅ มีไฟล์ web/index.html
+- ✅ มีไฟล์ web/styles.css
+- ✅ มีไฟล์ web/app.js
+- ✅ มีไฟล์ apps-script/Code.gs
+- ✅ มีไฟล์ apps-script/index.html
+- ✅ มีไฟล์ apps-script/styles.html
+- ✅ มีไฟล์ apps-script/app.html
+- ✅ มีไฟล์ apps-script/transaction_form.html
+- ✅ มีไฟล์ apps-script/appsscript.json
+- ✅ มีไฟล์ README.md
+- ✅ มีไฟล์ .gitignore
+- ✅ มีไฟล์ index.html
+- ✅ มีไฟล์ verify_project.py
+- ✅ มีไฟล์ docs/CLEANUP_REPORT.md
+- ✅ มีไฟล์ docs/SETUP_APPS_SCRIPT.md
+- ✅ มีไฟล์ docs/DEPLOYMENT.md
+- ✅ ไม่มีไฟล์ขยะ local_preview.html
+- ✅ ไม่มีไฟล์ขยะ preview.html
+- ✅ ไม่มีไฟล์ขยะ pages.css
+- ✅ ไม่มีไฟล์ขยะ pages.js
+- ✅ web/index.html ไม่มี Apps Script template syntax (<?=)
+- ✅ web/index.html มี link ไป styles.css
+- ✅ web/index.html มี link ไป app.js
+- ✅ web/index.html มี localStorage mock (mockApi หรือ STORAGE_KEY)
+- ✅ web/index.html ไม่มี google.script.run (production code)
+- ✅ web/index.html มี bottom-nav
+- ✅ web/index.html มีฟอร์ม incomeForm
+- ✅ web/index.html มีฟอร์ม expenseForm
+- ✅ web/app.js มี localStorage mock
+- ✅ web/app.js มี mockApi function
+- ✅ web/app.js มี gas() bridge function
+- ✅ web/app.js มี Asia/Bangkok
+- ✅ web/app.js ไม่มี google.script.run โดยตรง (ใช้ผ่าน gas())
+- ✅ web/app.js syntax ผ่าน node --check
+- ✅ appsscript.json เป็น JSON ถูกต้อง
+- ✅ timezone เป็น Asia/Bangkok
+- ✅ runtimeVersion เป็น V8
+- ✅ มี webapp config
+- ✅ มี oauthScopes
+- ✅ มีฟังก์ชัน doGet()
+- ✅ มีฟังก์ชัน include()
+- ✅ มีฟังก์ชัน setupApp()
+- ✅ มีฟังก์ชัน installEditTrigger()
+- ✅ มีฟังก์ชัน onEditInstalled()
+- ✅ มีฟังก์ชัน handleEdit()
+- ✅ มีฟังก์ชัน getBootstrapData()
+- ✅ มีฟังก์ชัน addTransaction()
+- ✅ มีฟังก์ชัน addCategory()
+- ✅ มีฟังก์ชัน uploadSlip_()
+- ✅ มีฟังก์ชัน getCategories()
+- ✅ มีฟังก์ชัน getDashboardData()
+- ✅ มีฟังก์ชัน getTransactions()
+- ✅ มีฟังก์ชัน buildTransactionRow_()
+- ✅ มีฟังก์ชัน nowBangkok_()
+- ✅ มีฟังก์ชัน ensureSheets_()
+- ✅ มีฟังก์ชัน writeLog_()
+- ✅ ตั้งค่า Spreadsheet ID แล้ว
+- ✅ ไม่มี SPREADSHEET_ID ว่าง
+- ✅ มีระบบอัปโหลดสลิปไป Drive
+- ✅ มี Asia/Bangkok ใน Code.gs
+- ✅ มี Utilities.formatDate ใน Code.gs
+- ✅ มีการกรอง type income/expense
+- ✅ Code.gs syntax ผ่าน node --check
+- ✅ apps-script/index.html มี include('styles')
+- ✅ apps-script/index.html มี include('app')
+- ✅ apps-script/index.html มี include('transaction_form')
+- ✅ apps-script/index.html มี <?= appTitle ?>
+- ✅ root index.html มี redirect ไป web/index.html
+- ✅ root index.html ไม่มี Apps Script syntax

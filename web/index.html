@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ff7a00">
+  <meta name="description" content="PEPS รายรับรายจ่าย — บันทึกรายรับและรายจ่ายด้วย Google Sheets ธีมดำ-ส้ม">
+  <title>PEPS รายรับรายจ่าย</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PEPS FINANCE</p>
+        <h1>รายรับรายจ่าย</h1>
+        <p class="subtext">Preview Mode · Asia/Bangkok</p>
+      </div>
+      <button class="icon-btn" id="syncBtn" type="button" aria-label="Sync">↻</button>
+    </header>
+
+    <!-- Preview Badge -->
+    <div class="preview-badge" id="previewBadge">
+      <span>🖥️</span>
+      <span><strong>Preview Mode</strong> — ข้อมูลเก็บใน localStorage · Deploy Apps Script เพื่อใช้กับ Google Sheets จริง</span>
+    </div>
+
+    <main>
+
+      <!-- ═══════════════════ DASHBOARD PAGE ═══════════════════ -->
+      <section class="page active" data-page="dashboard">
+        <div class="hero-card">
+          <div>
+            <p class="muted">คงเหลือเดือนนี้</p>
+            <h2 id="monthNet">฿0</h2>
+            <p class="live-clock" id="liveClock">กำลังโหลดเวลา...</p>
+          </div>
+          <span class="status-pill" id="syncStatus">พร้อมใช้งาน</span>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric income">
+            <span>รายรับวันนี้</span>
+            <strong id="todayIncome">฿0</strong>
+          </article>
+          <article class="metric expense">
+            <span>รายจ่ายวันนี้</span>
+            <strong id="todayExpense">฿0</strong>
+          </article>
+          <article class="metric">
+            <span>รายรับเดือนนี้</span>
+            <strong id="monthIncome">฿0</strong>
+          </article>
+          <article class="metric">
+            <span>รายจ่ายเดือนนี้</span>
+            <strong id="monthExpense">฿0</strong>
+          </article>
+        </div>
+
+        <div class="panel warning-panel" id="missingSlipPanel">
+          <span>🧾 รายการที่ยังไม่มีสลิป</span>
+          <strong id="missingSlipCount">0</strong>
+        </div>
+
+        <section class="panel">
+          <div class="section-head">
+            <h3>รายการล่าสุด</h3>
+            <button class="ghost-btn" data-nav="reports" type="button">ดูรายงาน</button>
+          </div>
+          <div id="recentList" class="list"></div>
+        </section>
+      </section>
+
+      <!-- ═══════════════════ INCOME PAGE ═══════════════════ -->
+      <section class="page" data-page="income">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">INCOME</p>
+            <h2>รายรับ</h2>
+          </div>
+          <span class="big-emoji">🟢</span>
+        </div>
+
+        <div class="summary-strip">
+          <span>วันนี้ <b id="incomeTodayMini">฿0</b></span>
+          <span>สัปดาห์นี้ <b id="incomeWeekMini">฿0</b></span>
+          <span>เดือนนี้ <b id="incomeMonthMini">฿0</b></span>
+        </div>
+
+        <form class="form-card" id="incomeForm" data-type="income" novalidate>
+          <!-- Auto Time -->
+          <div class="auto-time-box">
+            <div>
+              <span>เวลาบันทึก</span>
+              <small>วันที่/เวลาปัจจุบัน Asia/Bangkok อัตโนมัติ</small>
+            </div>
+            <b>⏱️ อัตโนมัติ</b>
+          </div>
+
+          <!-- Amount -->
+          <label>
+            จำนวนเงิน (บาท) *
+            <input name="amount" id="incomeAmount" inputmode="decimal" type="number"
+                   step="0.01" min="0.01" placeholder="0.00" required>
+          </label>
+
+          <!-- Category -->
+          <label>
+            หัวข้อ / หมวดหมู่ *
+            <div class="inline-field">
+              <select name="category" id="incomeCategorySelect" required>
+                <option value="">-- เลือกหมวดหมู่ --</option>
+              </select>
+              <button class="ghost-btn add-inline-category" type="button" id="addIncomeCatBtn">+ เพิ่ม</button>
+            </div>
+          </label>
+
+          <!-- Title -->
+          <label>
+            ชื่อรายการ *
+            <input name="title" id="incomeTitle" placeholder="เช่น รับงานถ่ายภาพฟุตบอล" required>
+          </label>
+
+          <!-- Note -->
+          <label>
+            หมายเหตุ
+            <textarea name="note" id="incomeNote" rows="3"
+                      placeholder="รายละเอียดเพิ่ม เช่น ลูกค้าโอนมัดจำ / งานไหน"></textarea>
+          </label>
+
+          <div class="two-col">
+            <label>
+              ช่องทางเงิน
+              <select name="payment_method" id="incomePayment">
+                <option>โอน</option>
+                <option>พร้อมเพย์</option>
+                <option>เงินสด</option>
+                <option>บัตร</option>
+                <option>อื่น ๆ</option>
+              </select>
+            </label>
+            <label>
+              สถานะ
+              <select name="status" id="incomeStatus">
+                <option value="paid">รับแล้ว</option>
+                <option value="pending">รอดำเนินการ</option>
+                <option value="cancelled">ยกเลิก</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="two-col">
+            <label>
+              งาน / โปรเจกต์
+              <input name="project" id="incomeProject" placeholder="เช่น ฟุตบอลเลิงนกทา">
+            </label>
+            <label>
+              ลูกค้า
+              <input name="client" id="incomeClient" placeholder="ชื่อลูกค้า / หน่วยงาน">
+            </label>
+          </div>
+
+          <label>
+            แนบสลิป
+            <input name="slip" id="incomeSlip" type="file" accept="image/*,.pdf">
+            <small>ไม่เกิน 5 MB · เก็บใน Google Drive (Production เท่านั้น)</small>
+          </label>
+
+          <button class="primary-btn income-btn" type="submit" id="incomeSubmitBtn">
+            บันทึกรายรับ
+          </button>
+        </form>
+      </section>
+
+      <!-- ═══════════════════ EXPENSE PAGE ═══════════════════ -->
+      <section class="page" data-page="expense">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">EXPENSE</p>
+            <h2>รายจ่าย</h2>
+          </div>
+          <span class="big-emoji">🔴</span>
+        </div>
+
+        <div class="summary-strip">
+          <span>วันนี้ <b id="expenseTodayMini">฿0</b></span>
+          <span>สัปดาห์นี้ <b id="expenseWeekMini">฿0</b></span>
+          <span>เดือนนี้ <b id="expenseMonthMini">฿0</b></span>
+        </div>
+
+        <form class="form-card" id="expenseForm" data-type="expense" novalidate>
+          <!-- Auto Time -->
+          <div class="auto-time-box">
+            <div>
+              <span>เวลาบันทึก</span>
+              <small>วันที่/เวลาปัจจุบัน Asia/Bangkok อัตโนมัติ</small>
+            </div>
+            <b>⏱️ อัตโนมัติ</b>
+          </div>
+
+          <!-- Amount -->
+          <label>
+            จำนวนเงิน (บาท) *
+            <input name="amount" id="expenseAmount" inputmode="decimal" type="number"
+                   step="0.01" min="0.01" placeholder="0.00" required>
+          </label>
+
+          <!-- Category -->
+          <label>
+            หัวข้อ / หมวดหมู่ *
+            <div class="inline-field">
+              <select name="category" id="expenseCategorySelect" required>
+                <option value="">-- เลือกหมวดหมู่ --</option>
+              </select>
+              <button class="ghost-btn add-inline-category" type="button" id="addExpenseCatBtn">+ เพิ่ม</button>
+            </div>
+          </label>
+
+          <!-- Title -->
+          <label>
+            ชื่อรายการ *
+            <input name="title" id="expenseTitle" placeholder="เช่น เติมน้ำมันรถ / ซื้ออุปกรณ์กล้อง" required>
+          </label>
+
+          <!-- Note -->
+          <label>
+            หมายเหตุ
+            <textarea name="note" id="expenseNote" rows="3"
+                      placeholder="รายละเอียดเพิ่ม เช่น ใช้ไปงานไหน / ซื้อที่ไหน"></textarea>
+          </label>
+
+          <div class="two-col">
+            <label>
+              ช่องทางเงิน
+              <select name="payment_method" id="expensePayment">
+                <option>โอน</option>
+                <option>พร้อมเพย์</option>
+                <option>เงินสด</option>
+                <option>บัตร</option>
+                <option>อื่น ๆ</option>
+              </select>
+            </label>
+            <label>
+              สถานะ
+              <select name="status" id="expenseStatus">
+                <option value="paid">จ่ายแล้ว</option>
+                <option value="pending">รอดำเนินการ</option>
+                <option value="cancelled">ยกเลิก</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="two-col">
+            <label>
+              งาน / โปรเจกต์
+              <input name="project" id="expenseProject" placeholder="เช่น ฟุตบอลเลิงนกทา">
+            </label>
+            <label>
+              ลูกค้า / จากไหน
+              <input name="client" id="expenseClient" placeholder="ชื่อลูกค้า / แหล่งที่ไป">
+            </label>
+          </div>
+
+          <label>
+            แนบสลิป
+            <input name="slip" id="expenseSlip" type="file" accept="image/*,.pdf">
+            <small>ไม่เกิน 5 MB · เก็บใน Google Drive (Production เท่านั้น)</small>
+          </label>
+
+          <button class="primary-btn expense-btn" type="submit" id="expenseSubmitBtn">
+            บันทึกรายจ่าย
+          </button>
+        </form>
+      </section>
+
+      <!-- ═══════════════════ REPORTS PAGE ═══════════════════ -->
+      <section class="page" data-page="reports">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">REPORT</p>
+            <h2>รายงาน</h2>
+          </div>
+          <span class="big-emoji">📊</span>
+        </div>
+
+        <section class="panel">
+          <h3>รายรับ vs รายจ่าย รายเดือน</h3>
+          <div id="monthlyBars" class="bar-chart"></div>
+        </section>
+
+        <section class="panel">
+          <h3>รายจ่ายตามหมวดหมู่</h3>
+          <div id="expenseCats" class="category-list"></div>
+        </section>
+
+        <section class="panel">
+          <h3>รายรับตามหมวดหมู่</h3>
+          <div id="incomeCats" class="category-list"></div>
+        </section>
+      </section>
+
+      <!-- ═══════════════════ SETTINGS PAGE ═══════════════════ -->
+      <section class="page" data-page="settings">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">SETTINGS</p>
+            <h2>ตั้งค่า</h2>
+          </div>
+          <span class="big-emoji">⚙️</span>
+        </div>
+
+        <section class="panel">
+          <h3>เพิ่มหมวดหมู่</h3>
+          <div class="category-add">
+            <label>
+              ประเภท
+              <select id="newCategoryType">
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+              </select>
+            </label>
+            <label>
+              ชื่อหมวดหมู่
+              <input id="newCategoryName" placeholder="ชื่อหมวดหมู่ใหม่">
+            </label>
+            <label>
+              &nbsp;
+              <button class="primary-btn" id="addCategoryBtn" type="button">เพิ่ม</button>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel small-text">
+          <h3>นโยบายเวลา</h3>
+          <p>วันที่และเวลาจะถูกบันทึกอัตโนมัติตอนกดบันทึก โดยยึดเขตเวลา <strong>Asia/Bangkok</strong> ไม่ต้องเลือกเอง</p>
+        </section>
+
+        <section class="panel small-text">
+          <h3>โหมด Preview</h3>
+          <p>ข้อมูลทั้งหมดเก็บใน <code>localStorage</code> ของ Browser นี้ หากต้องการใช้กับ Google Sheets จริง ให้ Deploy เป็น Google Apps Script Web App</p>
+          <br>
+          <button class="ghost-btn" id="clearDataBtn" type="button" style="color:#ff4b55">🗑️ ล้างข้อมูล Preview ทั้งหมด</button>
+        </section>
+
+        <section class="panel small-text">
+          <h3>Google Sheets Integration</h3>
+          <p>Spreadsheet ID: <code>1VMzcS0GmqCNa8WcdA9GQdoslYIoDhZJXGVSgUUMKBJE</code></p>
+          <p style="margin-top:8px">Deploy Apps Script จากโฟลเดอร์ <code>apps-script/</code> ในโปรเจกต์นี้</p>
+        </section>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" aria-label="Navigation">
+      <button class="nav-btn active" data-nav="dashboard" type="button" id="navDashboard">
+        🏠<span>รวม</span>
+      </button>
+      <button class="nav-btn" data-nav="income" type="button" id="navIncome">
+        🟢<span>รายรับ</span>
+      </button>
+      <button class="nav-btn" data-nav="expense" type="button" id="navExpense">
+        🔴<span>รายจ่าย</span>
+      </button>
+      <button class="nav-btn" data-nav="reports" type="button" id="navReports">
+        📊<span>กราฟ</span>
+      </button>
+      <button class="nav-btn" data-nav="settings" type="button" id="navSettings">
+        ⚙️<span>ตั้งค่า</span>
+      </button>
+    </nav>
+
+    <!-- Toast -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  </div><!-- /.app-shell -->
+
+  <script src="app.js"></script>
+</body>
+</html>

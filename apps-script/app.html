@@ -1,0 +1,346 @@
+<script>
+(() => {
+  'use strict';
+
+  /* ── Constants ── */
+  const MAX_SLIP_SIZE = 5 * 1024 * 1024;
+
+  /* ── State ── */
+  const state = {
+    categories: { income: [], expense: [] },
+    dashboard: null,
+    recent: [],
+    loading: false,
+  };
+
+  /* ── Utils ── */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+  const money = (v) =>
+    new Intl.NumberFormat('th-TH', {
+      style: 'currency', currency: 'THB', maximumFractionDigits: 0,
+    }).format(Number(v || 0));
+
+  const escapeHtml = (str) =>
+    String(str || '').replace(/[&<>'"]/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+    }[c]));
+
+  /* ── GAS bridge — Production only (google.script.run) ── */
+  function gas(fn, payload) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [fn](payload);
+    });
+  }
+
+  /* ── File to base64 ── */
+  function fileToPayload(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64: String(reader.result).split(',')[1],
+      });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ── Navigation ── */
+  function navigate(page) {
+    $$('.page').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+    $$('.nav-btn').forEach(el => el.classList.toggle('active', el.dataset.nav === page));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Loading ── */
+  function setLoading(value, msg) {
+    state.loading = value;
+    const btn = $('#syncBtn');
+    if (btn) btn.disabled = value;
+    if (value && msg) setStatus(msg);
+  }
+
+  function setStatus(text, type) {
+    const el = $('#syncStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'status-pill' + (type ? ' ' + type : '');
+  }
+
+  /* ── Toast ── */
+  let _tt;
+  function toast(msg, type) {
+    const el = $('#toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(_tt);
+    _tt = setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  /* ── Clock ── */
+  function startClock() {
+    const tick = () => {
+      const el = $('#liveClock');
+      if (!el) return;
+      el.textContent = new Intl.DateTimeFormat('th-TH', {
+        timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'medium',
+      }).format(new Date());
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  /* ── Render ── */
+  function renderAll() {
+    renderCategories();
+    renderDashboard();
+    renderRecent();
+    renderReports();
+  }
+
+  function renderCategories() {
+    ['income', 'expense'].forEach(type => {
+      const form = $(`#${type}Form`);
+      if (!form) return;
+      const sel = $('select[name="category"]', form);
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">-- เลือกหมวดหมู่ --</option>';
+      (state.categories[type] || []).forEach(cat => {
+        const o = document.createElement('option');
+        o.value = cat; o.textContent = cat;
+        sel.appendChild(o);
+      });
+      if (cur) sel.value = cur;
+    });
+  }
+
+  function renderDashboard() {
+    const d = state.dashboard;
+    if (!d) return;
+    const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    set('#todayIncome',   money(d.today.income));
+    set('#todayExpense',  money(d.today.expense));
+    set('#monthIncome',   money(d.month.income));
+    set('#monthExpense',  money(d.month.expense));
+    set('#monthNet',      money(d.month.net));
+    set('#missingSlipCount', d.missingSlipCount || 0);
+    set('#incomeTodayMini',  money(d.today.income));
+    set('#incomeWeekMini',   money(d.week.income));
+    set('#incomeMonthMini',  money(d.month.income));
+    set('#expenseTodayMini', money(d.today.expense));
+    set('#expenseWeekMini',  money(d.week.expense));
+    set('#expenseMonthMini', money(d.month.expense));
+  }
+
+  function renderRecent() {
+    const el = $('#recentList');
+    if (!el) return;
+    const data = state.recent || [];
+    if (!data.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>ยังไม่มีรายการ</div>';
+      return;
+    }
+    el.innerHTML = data.map(t => {
+      const sign = t.type === 'income' ? '+' : '-';
+      const cls  = t.type === 'income' ? 'income' : 'expense';
+      const slip = t.slip_url
+        ? ` · <a href="${escapeHtml(t.slip_url)}" target="_blank" rel="noopener">ดูสลิป</a>` : '';
+      const note = t.note ? `<div class="txn-meta">${escapeHtml(t.note)}</div>` : '';
+      return `<article class="txn-item">
+        <div style="flex:1;min-width:0">
+          <strong>${escapeHtml(t.title || '-')}</strong>
+          <div class="txn-meta">${escapeHtml(t.category || '-')} · ${escapeHtml(t.date || '')} ${escapeHtml(t.time || '')}${slip}</div>
+          ${note}
+        </div>
+        <div class="txn-amount ${cls}">${sign}${money(t.amount)}</div>
+      </article>`;
+    }).join('');
+  }
+
+  function renderReports() {
+    const d = state.dashboard;
+    if (!d) return;
+    renderMonthlyBars(d.monthlySeries || []);
+    renderCategoryList('#expenseCats', d.expenseByCategory || []);
+    renderCategoryList('#incomeCats', d.incomeByCategory || []);
+  }
+
+  function renderMonthlyBars(series) {
+    const el = $('#monthlyBars');
+    if (!el) return;
+    if (!series.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>ยังไม่มีข้อมูล</div>';
+      return;
+    }
+    const max = Math.max(...series.flatMap(s => [s.income, s.expense, 1]));
+    el.innerHTML = series.map(item => `
+      <div class="bar-row">
+        <div class="bar-label"><span>${escapeHtml(item.month)}</span><b>${money(item.net)}</b></div>
+        <div class="bars">
+          <div class="bar income" style="width:${Math.max(2, item.income/max*100).toFixed(1)}%"></div>
+          <div class="bar expense" style="width:${Math.max(2, item.expense/max*100).toFixed(1)}%"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderCategoryList(sel, rows) {
+    const el = $(sel);
+    if (!el) return;
+    if (!rows.length) { el.innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div class="category-row">
+        <span>${escapeHtml(r.category)}</span>
+        <strong>${money(r.amount)}</strong>
+      </div>`).join('');
+  }
+
+  /* ── Load data ── */
+  async function loadData() {
+    if (state.loading) return;
+    setLoading(true, 'กำลัง Sync...');
+    setStatus('กำลัง Sync...', 'syncing');
+    try {
+      const data = await gas('getBootstrapData');
+      state.categories = data.categories || { income: [], expense: [] };
+      state.dashboard = data.dashboard || null;
+      state.recent = data.recent || [];
+      renderAll();
+      setStatus('Sync แล้ว');
+    } catch (err) {
+      console.error('[PEPS] loadData error:', err);
+      setStatus('โหลดไม่สำเร็จ', 'error');
+      toast('โหลดข้อมูลไม่สำเร็จ: ' + (err.message || String(err)), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ── Submit form ── */
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const type = form.dataset.type;
+    const fd = new FormData(form);
+
+    const payload = {
+      type,
+      amount:         fd.get('amount'),
+      category:       fd.get('category'),
+      title:          (fd.get('title') || '').trim(),
+      note:           (fd.get('note') || '').trim(),
+      payment_method: fd.get('payment_method') || 'โอน',
+      project:        (fd.get('project') || '').trim(),
+      client:         (fd.get('client') || '').trim(),
+      status:         fd.get('status') || 'paid',
+    };
+
+    const file = fd.get('slip');
+    if (file && file.name && file.size > 0) {
+      if (file.size > MAX_SLIP_SIZE) return toast('ไฟล์ใหญ่เกิน 5 MB', 'error');
+      try { payload.slip = await fileToPayload(file); } catch (_) { /* skip */ }
+    }
+
+    setLoading(true, type === 'income' ? 'กำลังบันทึกรายรับ...' : 'กำลังบันทึกรายจ่าย...');
+    try {
+      const res = await gas('addTransaction', payload);
+      state.dashboard = res.dashboard;
+      state.recent    = res.recent;
+      state.categories = res.categories;
+      form.reset();
+      renderAll();
+      toast(res.message || 'บันทึกแล้ว', 'success');
+      navigate('dashboard');
+    } catch (err) {
+      console.error('[PEPS] addTransaction error:', err);
+      toast(err.message || String(err), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ── Inline add category ── */
+  async function promptAddCategory(type) {
+    const label = type === 'income' ? 'เพิ่มหัวข้อรายรับใหม่' : 'เพิ่มหัวข้อรายจ่ายใหม่';
+    const category = window.prompt(label);
+    if (!category || !category.trim()) return;
+    setLoading(true, 'กำลังเพิ่มหมวดหมู่...');
+    try {
+      const res = await gas('addCategory', { type, category: category.trim() });
+      state.categories = res.categories;
+      renderCategories();
+      toast('เพิ่มหมวดหมู่แล้ว', 'success');
+    } catch (err) {
+      toast(err.message || String(err), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ── Bind ── */
+  function bindNavigation() {
+    $$('[data-nav]').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.nav)));
+    const sb = $('#syncBtn');
+    if (sb) sb.addEventListener('click', loadData);
+  }
+
+  function bindForms() {
+    ['incomeForm', 'expenseForm'].forEach(id => {
+      const form = $('#' + id);
+      if (!form) return;
+      form.addEventListener('submit', handleSubmit);
+      const addBtn = $('.add-inline-category', form);
+      if (addBtn) addBtn.addEventListener('click', () => promptAddCategory(form.dataset.type));
+      const fi = $('input[name="slip"]', form);
+      if (fi) fi.addEventListener('change', () => {
+        if (fi.files[0] && fi.files[0].size > MAX_SLIP_SIZE) {
+          toast('ไฟล์ใหญ่เกิน 5 MB', 'error');
+          fi.value = '';
+        }
+      });
+    });
+  }
+
+  function bindSettings() {
+    const btn = $('#addCategoryBtn');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        const type = $('#newCategoryType').value;
+        const category = ($('#newCategoryName').value || '').trim();
+        if (!category) return toast('กรอกชื่อหมวดหมู่ก่อน', 'error');
+        setLoading(true, 'กำลังเพิ่มหมวดหมู่...');
+        try {
+          const res = await gas('addCategory', { type, category });
+          state.categories = res.categories;
+          renderCategories();
+          $('#newCategoryName').value = '';
+          toast('เพิ่มหมวดหมู่แล้ว', 'success');
+        } catch (err) {
+          toast(err.message || String(err), 'error');
+        } finally {
+          setLoading(false);
+        }
+      });
+    }
+  }
+
+  /* ── Init ── */
+  function init() {
+    bindNavigation();
+    bindForms();
+    bindSettings();
+    startClock();
+    loadData();
+    setInterval(loadData, 30000);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
