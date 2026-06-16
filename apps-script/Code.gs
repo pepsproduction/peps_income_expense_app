@@ -177,7 +177,6 @@ function addCategory(payload) {
 }
 
 function addTransaction(payload) {
-  setupApp();
   if (!payload) throw new Error('ไม่พบข้อมูลรายการ');
 
   const type = normalizeType_(payload.type);
@@ -191,13 +190,17 @@ function addTransaction(payload) {
   if (!category) throw new Error('กรุณาเลือกหรือเพิ่มหมวดหมู่');
   if (!title) throw new Error('กรุณากรอกชื่อรายการ');
 
-  // Auto-register category
-  addCategory({ type, category });
+  // ตรวจเช็คและเพิ่มหมวดหมู่ (ดึงข้อมูล categories ครั้งเดียว)
+  const categories = getCategories();
+  if (!categories[type].some(c => c.toLowerCase() === category.toLowerCase())) {
+    const nowTemp = nowBangkok_();
+    getSheet_(CONFIG.CATEGORIES_SHEET).appendRow([type, category, true, nowTemp.date + ' ' + nowTemp.time]);
+  }
 
   const now = nowBangkok_();
   const id = makeTxnId_(type, now.date);
 
-  // Upload slip if provided
+  // อัปโหลดสลิป
   let slipUrl = '';
   if (payload.slip && payload.slip.base64) {
     slipUrl = uploadSlip_(payload.slip, id, type, title, now);
@@ -224,15 +227,23 @@ function addTransaction(payload) {
 
   const sheet = getSheet_(CONFIG.TRANSACTIONS_SHEET);
   sheet.appendRow(row);
-  formatTransactionsSheet_();
+  
+  // จัดรูปแบบเฉพาะแถวใหม่ที่เพิ่มเข้ามา แทนที่จะจัดรูปแบบทั้งแผ่นงาน
+  const lastRow = sheet.getLastRow();
+  formatSingleRow_(sheet, lastRow);
+  
   writeLog_('ADD_TRANSACTION', id, '', '', JSON.stringify({ type, category, amount }), 'app');
+
+  // ดึงข้อมูลสเปรดชีตเพียงรอบเดียวและแชร์ให้แดชบอร์ดกับรายการล่าสุด
+  const allRows = getDataRows_(sheet);
+  const allTxns = allRows.map(rowToTransaction_);
 
   return {
     ok: true,
     message: type === 'income' ? 'บันทึกรายรับแล้ว' : 'บันทึกรายจ่ายแล้ว',
     transaction: rowToTransaction_(row),
-    dashboard: getDashboardData(),
-    recent: getTransactions({ limit: 25 }),
+    dashboard: getDashboardData(allTxns),
+    recent: getTransactions({ limit: 25 }, allTxns),
     categories: getCategories(),
   };
 }
@@ -244,12 +255,19 @@ function buildTransactionRow_(data) {
   return HEADERS.map(h => (data[h] !== undefined ? data[h] : ''));
 }
 
-function getTransactions(options) {
+function getTransactions(options, preloadedTxns) {
   const opts = options || {};
   const limit = Math.max(1, Math.min(Number(opts.limit || 100), 500));
   const type = normalizeType_(opts.type);
-  const rows = getDataRows_(getSheet_(CONFIG.TRANSACTIONS_SHEET));
-  let txns = rows.map(rowToTransaction_).filter(t => t.id && t.id !== 'ยังไม่มีข้อมูล');
+  
+  let txns = preloadedTxns;
+  if (!txns) {
+    const rows = getDataRows_(getSheet_(CONFIG.TRANSACTIONS_SHEET));
+    txns = rows.map(rowToTransaction_).filter(t => t.id && t.id !== 'ยังไม่มีข้อมูล');
+  } else {
+    txns = txns.filter(t => t.id && t.id !== 'ยังไม่มีข้อมูล');
+  }
+
   if (type) txns = txns.filter(t => t.type === type);
   txns.sort((a, b) => {
     const da = new Date(a.created_at_raw || a.created_at).getTime();
@@ -259,9 +277,14 @@ function getTransactions(options) {
   return txns.slice(0, limit);
 }
 
-function getDashboardData() {
-  const rows = getDataRows_(getSheet_(CONFIG.TRANSACTIONS_SHEET));
-  const txns = rows.map(rowToTransaction_).filter(t => t.id && t.status !== 'cancelled');
+function getDashboardData(preloadedTxns) {
+  let txns = preloadedTxns;
+  if (!txns) {
+    const rows = getDataRows_(getSheet_(CONFIG.TRANSACTIONS_SHEET));
+    txns = rows.map(rowToTransaction_).filter(t => t.id && t.status !== 'cancelled');
+  } else {
+    txns = txns.filter(t => t.id && t.status !== 'cancelled');
+  }
 
   const now = nowBangkok_();
   const todayStr = now.date;
@@ -423,6 +446,19 @@ function formatTransactionsSheet_() {
     sheet.getRange(2, 15, lastRow - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
   } catch (err) {
     console.error('[PEPS] formatTransactionsSheet_ error:', err);
+  }
+}
+
+function formatSingleRow_(sheet, row) {
+  try {
+    if (row <= 1) return;
+    sheet.getRange(row, 2).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+    sheet.getRange(row, 3).setNumberFormat('yyyy-mm-dd');
+    sheet.getRange(row, 4).setNumberFormat('hh:mm:ss');
+    sheet.getRange(row, 8).setNumberFormat('฿#,##0.00');
+    sheet.getRange(row, 15).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  } catch (err) {
+    console.error('[PEPS] formatSingleRow_ error:', err);
   }
 }
 

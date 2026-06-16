@@ -7,13 +7,18 @@
 | ไฟล์ | ขนาด | เหตุผล |
 |------|------|--------|
 | `local_preview.html` | 31,655 bytes (31KB) | ซ้ำกับ `/web/index.html` ที่สร้างใหม่ ซึ่งมีฟีเจอร์ครบและดีกว่า ไฟล์นี้เป็น monolithic HTML ที่มี CSS และ JS ฝังอยู่ภายใน ทำให้สับสนว่าควรใช้ไฟล์ไหนเป็น GitHub Pages หลัก |
+| `Code.gs` (root) | 16,150 bytes | ย้ายและพัฒนาต่อใน `/apps-script/Code.gs` การเก็บไว้ระดับ root ทำให้สับสนและอาจชนกับระบบ |
+| `app.html` (root) | 13,160 bytes | ย้ายและพัฒนาต่อใน `/apps-script/app.html` หลีกเลี่ยงความสับสนระหว่าง Preview และ Production |
+| `styles.html` (root) | 7,476 bytes | ย้ายและพัฒนาต่อใน `/apps-script/styles.html` หลีกเลี่ยงความสับสน |
+| `transaction_form.html` (root) | 2,248 bytes | ย้ายและพัฒนาต่อใน `/apps-script/transaction_form.html` |
+| `appsscript.json` (root) | 371 bytes | ย้ายและใช้งานต่อใน `/apps-script/appsscript.json` |
 
-## ไฟล์ที่ถูกย้าย (ไม่ใช่ลบ)
+## ไฟล์ที่ถูกย้ายและลบต้นทางแล้ว
 
 | ไฟล์เดิม (root) | ย้ายไปที่ | หมายเหตุ |
 |----------------|-----------|---------|
-| `Code.gs` | `apps-script/Code.gs` | เพิ่มฟังก์ชันใหม่ + ปรับปรุง |
-| `index.html` | `apps-script/index.html` | ใช้ Apps Script template syntax |
+| `Code.gs` | `apps-script/Code.gs` | เพิ่มประสิทธิภาพ + จัดการ Date format serialization |
+| `index.html` | `apps-script/index.html` | ใช้งานบน Apps Script Web App |
 | `styles.html` | `apps-script/styles.html` | CSS wrapper สำหรับ HtmlService |
 | `app.html` | `apps-script/app.html` | JS wrapper สำหรับ HtmlService |
 | `transaction_form.html` | `apps-script/transaction_form.html` | Form HTML fragment |
